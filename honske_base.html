@@ -323,8 +323,8 @@ function sw(tab){
   ['cal','inp','mbr'].forEach(t=>{document.getElementById('tab-'+t).style.display=t===tab?'':'none';});
   document.querySelectorAll('.tab').forEach((b,i)=>{b.classList.toggle('active',['cal','inp','mbr'][i]===tab);});
   if(tab==='mbr') renderMbr();
-  if(tab==='cal') renderCal();
-  if(tab==='inp') { loadFromGAS().then(()=>{ if(inpMbr) renderInpCal(); }); }
+  if(tab==='cal') loadFromGAS();
+  if(tab==='inp') { if(inpMbr) renderInpCal(); }
 }
 
 function dk(y,m,d){return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}
