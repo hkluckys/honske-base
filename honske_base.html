@@ -439,7 +439,7 @@ function showDetail(y,m,d){
     html+=`<button class="unconfirm-btn" onclick="doUnconfirm('${k}')">確定を取り消す</button>`;
   }
   panel.innerHTML=html;
-  panel.style.display='';
+  panel.style.display='block';
   panel.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
@@ -506,7 +506,7 @@ function openSlotPanel(y,m,d){
   if(!data[inpMbr]) data[inpMbr]={};
   if(!data[inpMbr][k]) data[inpMbr][k]={};
   const panel=document.getElementById('slot-panel');
-  panel.style.display='';
+  panel.style.display='block';
   renderSlotPanel(k,m,d);
   setTimeout(()=>panel.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
 }
