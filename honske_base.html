@@ -238,6 +238,35 @@ function showError(msg){
   setTimeout(()=>el.classList.remove('show'), 4000);
 }
 
+// 日付キーを "YYYY-MM-DD" 形式に正規化
+function normDateKey(k) {
+  if (!k) return k;
+  // 既に "YYYY-MM-DD" 形式ならそのまま
+  if (/^\d{4}-\d{2}-\d{2}$/.test(k)) return k;
+  // "Sat Jun 13 2026 ..." のような形式を変換
+  const d = new Date(k);
+  if (!isNaN(d.getTime())) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  }
+  return k;
+}
+
+// dataオブジェクトの全キーを正規化
+function normalizeData(raw) {
+  const result = {};
+  Object.keys(raw).forEach(memberId => {
+    result[memberId] = {};
+    Object.keys(raw[memberId]).forEach(dateKey => {
+      const nk = normDateKey(dateKey);
+      result[memberId][nk] = raw[memberId][dateKey];
+    });
+  });
+  return result;
+}
+
 // GASからデータ取得
 async function loadFromGAS(){
   if(!GAS_URL){
@@ -248,8 +277,11 @@ async function loadFromGAS(){
     const res = await fetch(`${GAS_URL}?action=getAll`);
     const json = await res.json();
     if(json.error){ showError('読み込みエラー: '+json.error); return; }
-    data = json.data || {};
-    confirmed = json.confirmed || {};
+    // キーを正規化してから格納
+    data = normalizeData(json.data || {});
+    const rawConf = json.confirmed || {};
+    confirmed = {};
+    Object.keys(rawConf).forEach(k => { confirmed[normDateKey(k)] = rawConf[k]; });
     renderCal(); renderMbr();
   }catch(e){
     showError('通信エラー。GAS URLを確認してください。');
