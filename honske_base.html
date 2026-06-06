@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ホンスケベース</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;background:#f5f5f5;color:#1a1a1a;}
+.app{max-width:480px;margin:0 auto;padding:1rem;background:#fff;min-height:100vh;}
+h1{font-size:18px;font-weight:600;}
+.sub{font-size:13px;color:#666;margin-top:2px;margin-bottom:1.25rem;}
+.tabs{display:flex;gap:6px;margin-bottom:1.25rem;}
+.tab{flex:1;padding:8px 4px;border-radius:8px;border:1px solid #ddd;font-size:13px;cursor:pointer;background:#fff;color:#666;text-align:center;}
+.tab.active{background:#1D9E75;color:#fff;border-color:#1D9E75;font-weight:600;}
+.loading{text-align:center;padding:2rem;color:#999;font-size:14px;}
+.error-bar{background:#FCEBEB;color:#501313;padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:1rem;display:none;}
+.error-bar.show{display:block;}
+
+/* カレンダー共通 */
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;}
+.cal-nav button{background:none;border:1px solid #ddd;border-radius:8px;padding:4px 12px;cursor:pointer;font-size:16px;}
+.cal-nav span{font-size:15px;font-weight:600;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+.cal-hd{text-align:center;font-size:11px;color:#999;padding:3px 0;}
+
+/* カレンダータブ */
+.cal-day{text-align:center;min-height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;border:1px solid transparent;font-size:12px;gap:2px;position:relative;}
+.cal-day.clickable{cursor:pointer;}
+.cal-day.clickable:hover{border-color:#ddd;background:#f9f9f9;}
+.cal-day .dn{font-size:12px;line-height:1;pointer-events:none;}
+.cal-day .badge{font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;line-height:1.4;pointer-events:none;}
+.cand-6{background:#FCEBEB;border-color:#E24B4A !important;}
+.cand-6 .dn{color:#501313;}
+.cand-6 .badge{background:#E24B4A;color:#fff;}
+.cand-5{background:#FAEEDA;border-color:#EF9F27 !important;}
+.cand-5 .dn{color:#633806;}
+.cand-5 .badge{background:#EF9F27;color:#412402;}
+.cand-4{background:#EAF3DE;border-color:#639922 !important;}
+.cand-4 .dn{color:#27500A;}
+.cand-4 .badge{background:#97C459;color:#173404;}
+.confirmed-day{background:#1D9E75 !important;border-color:#0F6E56 !important;}
+.confirmed-day .dn{color:#fff !important;font-weight:600;}
+.confirmed-day .badge{background:#085041;color:#9FE1CB;}
+.confirmed-day::after{content:'●';position:absolute;top:2px;right:3px;font-size:9px;color:#9FE1CB;pointer-events:none;}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;}
+.leg{display:flex;align-items:center;gap:4px;font-size:12px;color:#666;}
+.leg-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+.detail-panel{margin-top:1rem;background:#f5f5f5;border-radius:8px;padding:12px;display:none;}
+.dp-title{font-size:14px;font-weight:600;margin-bottom:10px;}
+.slot-block{margin-bottom:10px;}
+.slot-label{font-size:12px;font-weight:600;color:#666;margin-bottom:4px;}
+.member-chips{display:flex;gap:4px;flex-wrap:wrap;}
+.mchip{font-size:11px;padding:3px 7px;border-radius:4px;font-weight:600;}
+.mchip-ok{background:#EAF3DE;color:#27500A;}
+.mchip-maybe{background:#FAEEDA;color:#633806;}
+.mchip-ng{background:#FCEBEB;color:#501313;}
+.mchip-none{background:#fff;color:#aaa;border:1px solid #eee;}
+.confirm-btn{width:100%;margin-top:10px;padding:10px;background:#1D9E75;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;}
+.confirm-btn:disabled{background:#aaa;cursor:default;}
+.unconfirm-btn{width:100%;margin-top:6px;padding:8px;background:none;color:#666;border:1px solid #ddd;border-radius:8px;font-size:13px;cursor:pointer;}
+.confirm-select{width:100%;margin-top:8px;font-size:13px;padding:6px;border:1px solid #ddd;border-radius:6px;}
+
+/* 予定入力タブ */
+.mbr-sel-wrap{margin-bottom:1rem;}
+.mbr-sel-wrap label{font-size:13px;color:#666;display:block;margin-bottom:5px;}
+.mbr-sel-wrap select{width:100%;padding:8px;border:1px solid #ddd;border-radius:8px;font-size:14px;}
+.status-legend{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.sl-item{font-size:11px;padding:3px 8px;border-radius:6px;}
+.sl-ok{background:#EAF3DE;color:#27500A;border:1px solid #97C459;}
+.sl-maybe{background:#FAEEDA;color:#633806;border:1px solid #FAC775;}
+.sl-ng{background:#FCEBEB;color:#501313;border:1px solid #F09595;}
+.sl-none{background:#f5f5f5;color:#666;border:1px solid #ddd;}
+.inp-cal-day{text-align:center;min-height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;border:1px solid #eee;font-size:12px;gap:2px;cursor:pointer;}
+.inp-cal-day:hover{border-color:#aaa;background:#f9f9f9;}
+.inp-cal-day.empty{cursor:default;pointer-events:none;border-color:transparent;}
+.inp-cal-day.has-entry{border-color:#1D9E75;background:#EAF3DE;}
+.inp-cal-day.has-entry .dn{color:#27500A;}
+.inp-cal-day .dn{pointer-events:none;font-size:12px;}
+.inp-cal-day .dot-row{display:flex;gap:2px;pointer-events:none;}
+.inp-cal-day .sdot{width:6px;height:6px;border-radius:50%;}
+.dot-ok{background:#1D9E75;}
+.dot-maybe{background:#EF9F27;}
+.dot-ng{background:#E24B4A;}
+.dot-none{background:#ccc;}
+.slot-input-panel{margin-top:1rem;background:#f5f5f5;border-radius:8px;padding:12px;}
+.sip-title{font-size:14px;font-weight:600;margin-bottom:4px;}
+.sip-hint{font-size:11px;color:#666;margin-bottom:10px;}
+.slot-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #e5e5e5;}
+.slot-row:last-child{border-bottom:none;}
+.slot-name{font-size:13px;width:30px;flex-shrink:0;font-weight:600;}
+.slot-btns{display:flex;gap:4px;flex:1;}
+.sbt{flex:1;padding:7px 4px;border-radius:6px;border:1px solid #ddd;font-size:12px;cursor:pointer;background:#fff;color:#666;text-align:center;}
+.sbt:hover{background:#f0f0f0;}
+.sbt.active-ok{background:#EAF3DE;color:#27500A;border-color:#97C459;font-weight:600;}
+.sbt.active-maybe{background:#FAEEDA;color:#633806;border-color:#FAC775;font-weight:600;}
+.sbt.active-ng{background:#FCEBEB;color:#501313;border-color:#F09595;font-weight:600;}
+.sbt.clear-btn{flex:0 0 30px;font-size:11px;color:#aaa;}
+.save-toast{font-size:12px;color:#0F6E56;margin-top:8px;padding:6px 10px;background:#EAF3DE;border-radius:6px;display:none;text-align:center;}
+.save-toast.show{display:block;}
+
+/* メンバータブ */
+.m-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #eee;}
+.m-row:last-child{border-bottom:none;}
+.m-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.m-name{font-size:14px;font-weight:600;flex:1;}
+.m-stat{font-size:12px;color:#666;}
+.stat-chips{display:flex;gap:8px;margin-top:1rem;}
+.sc{flex:1;text-align:center;padding:10px 8px;background:#f5f5f5;border-radius:8px;}
+.sc .n{font-size:22px;font-weight:700;}
+.sc .l{font-size:11px;color:#666;}
+.sc.green .n{color:#0F6E56;}
+
+/* GAS URL設定 */
+.gas-setup{background:#EAF3DE;border:1px solid #97C459;border-radius:8px;padding:12px;margin-bottom:1rem;}
+.gas-setup p{font-size:13px;color:#27500A;margin-bottom:8px;}
+.gas-setup input{width:100%;padding:7px;border:1px solid #97C459;border-radius:6px;font-size:12px;margin-bottom:6px;}
+.gas-setup button{padding:7px 14px;background:#1D9E75;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>ホンスケベース</h1>
+  <p class="sub">香港好運 — 練習スケジュール調整</p>
+
+  <!-- GAS URL未設定時の案内 -->
+  <div class="gas-setup" id="gas-setup" style="display:none;">
+    <p>GAS Web App URLを設定してください</p>
+    <input type="text" id="gas-url-input" placeholder="https://script.google.com/macros/s/..." />
+    <button onclick="saveGasUrl()">保存して接続</button>
+  </div>
+
+  <div class="error-bar" id="error-bar"></div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="sw('cal')">カレンダー</button>
+    <button class="tab" onclick="sw('inp')">予定入力</button>
+    <button class="tab" onclick="sw('mbr')">メンバー</button>
+  </div>
+
+  <!-- カレンダータブ -->
+  <div id="tab-cal">
+    <div class="cal-nav">
+      <button onclick="chCal(-1)">‹</button>
+      <span id="cal-lbl"></span>
+      <button onclick="chCal(1)">›</button>
+    </div>
+    <div class="cal-grid">
+      <div class="cal-hd">日</div><div class="cal-hd">月</div><div class="cal-hd">火</div>
+      <div class="cal-hd">水</div><div class="cal-hd">木</div><div class="cal-hd">金</div><div class="cal-hd">土</div>
+    </div>
+    <div class="cal-grid" id="cal-body"></div>
+    <div class="legend">
+      <div class="leg"><div class="leg-dot" style="background:#1D9E75;"></div>確定●</div>
+      <div class="leg"><div class="leg-dot" style="background:#E24B4A;"></div>6人</div>
+      <div class="leg"><div class="leg-dot" style="background:#EF9F27;"></div>5人</div>
+      <div class="leg"><div class="leg-dot" style="background:#97C459;"></div>4人</div>
+    </div>
+    <div id="det-panel" class="detail-panel"></div>
+  </div>
+
+  <!-- 予定入力タブ -->
+  <div id="tab-inp" style="display:none;">
+    <div class="mbr-sel-wrap">
+      <label>メンバー選択</label>
+      <select id="mbr-sel" onchange="onMbrSel()">
+        <option value="">-- 選択してください --</option>
+      </select>
+    </div>
+    <div id="inp-inner" style="display:none;">
+      <div class="status-legend">
+        <span class="sl-item sl-ok">○ 空いてる</span>
+        <span class="sl-item sl-maybe">△ たぶん大丈夫</span>
+        <span class="sl-item sl-ng">× 無理</span>
+        <span class="sl-item sl-none">— 未登録</span>
+      </div>
+      <div class="cal-nav">
+        <button onclick="chInp(-1)">‹</button>
+        <span id="inp-lbl"></span>
+        <button onclick="chInp(1)">›</button>
+      </div>
+      <div class="cal-grid">
+        <div class="cal-hd">日</div><div class="cal-hd">月</div><div class="cal-hd">火</div>
+        <div class="cal-hd">水</div><div class="cal-hd">木</div><div class="cal-hd">金</div><div class="cal-hd">土</div>
+      </div>
+      <div class="cal-grid" id="inp-cal-body"></div>
+      <div class="save-toast" id="save-toast">保存しました</div>
+      <div id="slot-panel" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- メンバータブ -->
+  <div id="tab-mbr" style="display:none;">
+    <div id="mbr-list"></div>
+    <div class="stat-chips" id="stat-chips"></div>
+  </div>
+</div>
+
+<script>
+const MEMBERS=[
+  {id:'Z',name:'ZAMZAM',bg:'#EEEDFE',tc:'#26215C'},
+  {id:'K',name:'KEN',bg:'#E1F5EE',tc:'#04342C'},
+  {id:'S',name:'SCINGO',bg:'#FAECE7',tc:'#4A1B0C'},
+  {id:'C',name:'COYAN',bg:'#FBEAF0',tc:'#4B1528'},
+  {id:'T',name:'TAKEBONNE',bg:'#E6F1FB',tc:'#042C53'},
+  {id:'Y',name:'YU',bg:'#EAF3DE',tc:'#173404'},
+];
+const SLOTS=['午前','午後','夜'];
+const SS={ok:'○',maybe:'△',ng:'×','':'—'};
+
+let data={}, confirmed={};
+let calY,calM,inpY,inpM,inpMbr='';
+let GAS_URL = localStorage.getItem('honske_gas_url') || '';
+
+const now=new Date();
+calY=now.getFullYear(); calM=now.getMonth();
+inpY=now.getFullYear(); inpM=now.getMonth();
+
+// GAS URL管理
+function saveGasUrl(){
+  const v = document.getElementById('gas-url-input').value.trim();
+  if(!v) return;
+  GAS_URL = v;
+  localStorage.setItem('honske_gas_url', v);
+  document.getElementById('gas-setup').style.display='none';
+  loadFromGAS();
+}
+
+function showError(msg){
+  const el=document.getElementById('error-bar');
+  el.textContent=msg; el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 4000);
+}
+
+// GASからデータ取得
+async function loadFromGAS(){
+  if(!GAS_URL){
+    document.getElementById('gas-setup').style.display='';
+    return;
+  }
+  try{
+    const res = await fetch(`${GAS_URL}?action=getAll`);
+    const json = await res.json();
+    if(json.error){ showError('読み込みエラー: '+json.error); return; }
+    data = json.data || {};
+    confirmed = json.confirmed || {};
+    renderCal(); renderMbr();
+  }catch(e){
+    showError('通信エラー。GAS URLを確認してください。');
+    document.getElementById('gas-setup').style.display='';
+  }
+}
+
+// GASへデータ送信
+async function postToGAS(payload){
+  try{
+    const res = await fetch(GAS_URL, {
+      method:'POST',
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if(json.error) showError('保存エラー: '+json.error);
+    else {
+      const t=document.getElementById('save-toast');
+      t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1400);
+    }
+    return json;
+  }catch(e){
+    showError('通信エラー。接続を確認してください。');
+    return {error: e.toString()};
+  }
+}
+
+function init(){
+  const sel=document.getElementById('mbr-sel');
+  MEMBERS.forEach(m=>{
+    const o=document.createElement('option');
+    o.value=m.id; o.textContent=`${m.id}: ${m.name}`;
+    sel.appendChild(o);
+  });
+  loadFromGAS();
+}
+
+function sw(tab){
+  ['cal','inp','mbr'].forEach(t=>{document.getElementById('tab-'+t).style.display=t===tab?'':'none';});
+  document.querySelectorAll('.tab').forEach((b,i)=>{b.classList.toggle('active',['cal','inp','mbr'][i]===tab);});
+  if(tab==='mbr') renderMbr();
+  if(tab==='cal') renderCal();
+}
+
+function dk(y,m,d){return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}
+function dim(y,m){return new Date(y,m+1,0).getDate();}
+function fd(y,m){return new Date(y,m,1).getDay();}
+
+function bestOk(y,m,d){
+  const k=dk(y,m,d);
+  let best=0;
+  SLOTS.forEach(sl=>{
+    const c=MEMBERS.filter(mb=>(data[mb.id]||{})[k]&&data[mb.id][k][sl]==='ok').length;
+    if(c>best) best=c;
+  });
+  return best;
+}
+
+function renderCal(){
+  document.getElementById('cal-lbl').textContent=`${calY}年${calM+1}月`;
+  const body=document.getElementById('cal-body');
+  body.innerHTML='';
+  const f=fd(calY,calM), days=dim(calY,calM);
+  for(let i=0;i<f;i++){
+    const el=document.createElement('div'); el.className='cal-day'; body.appendChild(el);
+  }
+  for(let d=1;d<=days;d++){
+    const k=dk(calY,calM,d);
+    const isConf=!!confirmed[k];
+    const mx=bestOk(calY,calM,d);
+    const el=document.createElement('div');
+    let cls='cal-day clickable', badge='';
+    if(isConf){cls+=' confirmed-day'; badge=`<span class="badge">${confirmed[k]}</span>`;}
+    else if(mx>=6){cls+=' cand-6'; badge=`<span class="badge">6人</span>`;}
+    else if(mx>=5){cls+=' cand-5'; badge=`<span class="badge">5人</span>`;}
+    else if(mx>=4){cls+=' cand-4'; badge=`<span class="badge">4人</span>`;}
+    el.className=cls;
+    el.innerHTML=`<span class="dn">${d}</span>${badge}`;
+    const _y=calY,_m=calM,_d=d;
+    el.onclick=function(){showDetail(_y,_m,_d);};
+    body.appendChild(el);
+  }
+  document.getElementById('det-panel').style.display='none';
+}
+
+function showDetail(y,m,d){
+  const k=dk(y,m,d);
+  const panel=document.getElementById('det-panel');
+  const isConf=!!confirmed[k];
+  let html=`<div class="dp-title">${m+1}月${d}日</div>`;
+  if(isConf){
+    html+=`<div style="padding:6px 10px;background:#1D9E75;border-radius:6px;color:#fff;font-size:13px;font-weight:600;margin-bottom:10px;">● 練習確定 — ${confirmed[k]}</div>`;
+  }
+  SLOTS.forEach(sl=>{
+    html+=`<div class="slot-block"><div class="slot-label">${sl}</div><div class="member-chips">`;
+    MEMBERS.forEach(mb=>{
+      const s=((data[mb.id]||{})[k]||{})[sl]||'';
+      const cls=s==='ok'?'mchip-ok':s==='maybe'?'mchip-maybe':s==='ng'?'mchip-ng':'mchip-none';
+      html+=`<span class="mchip ${cls}">${mb.id} ${SS[s]}</span>`;
+    });
+    html+='</div></div>';
+  });
+  if(!isConf){
+    const best=SLOTS.map(sl=>{
+      const cnt=MEMBERS.filter(mb=>(data[mb.id]||{})[k]&&data[mb.id][k][sl]==='ok').length;
+      return{sl,cnt};
+    }).filter(x=>x.cnt>=4).sort((a,b)=>b.cnt-a.cnt);
+    if(best.length>0){
+      html+=`<select class="confirm-select" id="conf-sel">`;
+      best.forEach(({sl,cnt})=>{html+=`<option value="${sl}">${sl}（○${cnt}人）</option>`;});
+      html+=`</select>`;
+      html+=`<button class="confirm-btn" onclick="doConfirm('${k}')">この日を練習確定する</button>`;
+    }else{
+      html+=`<div style="font-size:12px;color:#666;margin-top:6px;">4人以上「空いてる」の時間帯がありません</div>`;
+    }
+  }else{
+    html+=`<button class="unconfirm-btn" onclick="doUnconfirm('${k}')">確定を取り消す</button>`;
+  }
+  panel.innerHTML=html;
+  panel.style.display='';
+  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+async function doConfirm(k){
+  const sel=document.getElementById('conf-sel'); if(!sel)return;
+  const slot=sel.value;
+  confirmed[k]=slot;
+  renderCal();
+  await postToGAS({action:'confirm', dateKey:k, slot});
+  const p=k.split('-'); showDetail(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));
+}
+async function doUnconfirm(k){
+  delete confirmed[k];
+  renderCal();
+  await postToGAS({action:'unconfirm', dateKey:k});
+  const p=k.split('-'); showDetail(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));
+}
+function chCal(d){
+  calM+=d; if(calM>11){calM=0;calY++;} if(calM<0){calM=11;calY--;} renderCal();
+}
+
+function onMbrSel(){
+  inpMbr=document.getElementById('mbr-sel').value;
+  const inner=document.getElementById('inp-inner');
+  const panel=document.getElementById('slot-panel');
+  if(inpMbr){
+    inner.style.display='';
+    panel.style.display='none'; panel.innerHTML='';
+    if(!data[inpMbr]) data[inpMbr]={};
+    renderInpCal();
+  }else{
+    inner.style.display='none';
+  }
+}
+
+function renderInpCal(){
+  document.getElementById('inp-lbl').textContent=`${inpY}年${inpM+1}月`;
+  const body=document.getElementById('inp-cal-body');
+  body.innerHTML='';
+  const f=fd(inpY,inpM), days=dim(inpY,inpM);
+  for(let i=0;i<f;i++){
+    const el=document.createElement('div'); el.className='inp-cal-day empty'; body.appendChild(el);
+  }
+  for(let d=1;d<=days;d++){
+    const k=dk(inpY,inpM,d);
+    const md=(data[inpMbr]||{})[k]||{};
+    const hasEntry=SLOTS.some(sl=>md[sl]&&md[sl]!=='');
+    const el=document.createElement('div');
+    el.className='inp-cal-day'+(hasEntry?' has-entry':'');
+    let dots='<div class="dot-row">';
+    SLOTS.forEach(sl=>{
+      const s=md[sl]||'';
+      dots+=`<div class="sdot ${s==='ok'?'dot-ok':s==='maybe'?'dot-maybe':s==='ng'?'dot-ng':'dot-none'}"></div>`;
+    });
+    dots+='</div>';
+    el.innerHTML=`<span class="dn">${d}</span>${dots}`;
+    const _y=inpY,_m=inpM,_d=d;
+    el.onclick=function(){openSlotPanel(_y,_m,_d);};
+    body.appendChild(el);
+  }
+}
+
+function openSlotPanel(y,m,d){
+  const k=dk(y,m,d);
+  if(!data[inpMbr]) data[inpMbr]={};
+  if(!data[inpMbr][k]) data[inpMbr][k]={};
+  const panel=document.getElementById('slot-panel');
+  panel.style.display='';
+  renderSlotPanel(k,m,d);
+  setTimeout(()=>panel.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
+}
+
+function renderSlotPanel(k,m,d){
+  const md=data[inpMbr][k];
+  let html=`<div class="slot-input-panel">`;
+  html+=`<div class="sip-title">${m+1}月${d}日</div>`;
+  html+=`<div class="sip-hint">時間帯ごとに参加可否を登録してください</div>`;
+  SLOTS.forEach(sl=>{
+    const cur=md[sl]||'';
+    html+=`<div class="slot-row"><span class="slot-name">${sl}</span><div class="slot-btns">`;
+    html+=`<button class="sbt${cur==='ok'?' active-ok':''}" onclick="setSlot('${k}','${sl}','ok')">○ 空いてる</button>`;
+    html+=`<button class="sbt${cur==='maybe'?' active-maybe':''}" onclick="setSlot('${k}','${sl}','maybe')">△ たぶん</button>`;
+    html+=`<button class="sbt${cur==='ng'?' active-ng':''}" onclick="setSlot('${k}','${sl}','ng')">× 無理</button>`;
+    if(cur!=='') html+=`<button class="sbt clear-btn" onclick="setSlot('${k}','${sl}','')">—</button>`;
+    html+=`</div></div>`;
+  });
+  html+=`</div>`;
+  document.getElementById('slot-panel').innerHTML=html;
+}
+
+async function setSlot(k,sl,v){
+  if(!data[inpMbr]) data[inpMbr]={};
+  if(!data[inpMbr][k]) data[inpMbr][k]={};
+  if(v==='') delete data[inpMbr][k][sl];
+  else data[inpMbr][k][sl]=v;
+  renderInpCal();
+  const p=k.split('-');
+  renderSlotPanel(k,parseInt(p[1])-1,parseInt(p[2]));
+  renderCal();
+  await postToGAS({action:'setSlot', memberId:inpMbr, dateKey:k, slot:sl, status:v});
+}
+
+function chInp(d){
+  inpM+=d; if(inpM>11){inpM=0;inpY++;} if(inpM<0){inpM=11;inpY--;}
+  renderInpCal();
+  const panel=document.getElementById('slot-panel');
+  panel.style.display='none'; panel.innerHTML='';
+}
+
+function renderMbr(){
+  const list=document.getElementById('mbr-list'); list.innerHTML='';
+  const confCnt=Object.keys(confirmed).length;
+  MEMBERS.forEach(mb=>{
+    const md=data[mb.id]||{};
+    let ok=0;
+    Object.values(md).forEach(dd=>{SLOTS.forEach(sl=>{if(dd[sl]==='ok')ok++;});});
+    const row=document.createElement('div'); row.className='m-row';
+    row.innerHTML=`<div class="m-avatar" style="background:${mb.bg};color:${mb.tc};">${mb.id}</div>
+      <div class="m-name">${mb.name}</div><div class="m-stat">○スロット: ${ok}</div>`;
+    list.appendChild(row);
+  });
+  const entered=MEMBERS.filter(mb=>Object.keys(data[mb.id]||{}).length>0).length;
+  document.getElementById('stat-chips').innerHTML=`
+    <div class="sc green"><div class="n">${confCnt}</div><div class="l">練習確定</div></div>
+    <div class="sc"><div class="n">${entered}</div><div class="l">入力済み</div></div>
+    <div class="sc"><div class="n">${6-entered}</div><div class="l">未入力</div></div>`;
+}
+
+init();
+</script>
+</body>
+</html>
