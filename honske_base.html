@@ -25,11 +25,17 @@ h1{font-size:18px;font-weight:600;}
 .cal-hd{text-align:center;font-size:11px;color:#999;padding:3px 0;}
 
 /* カレンダータブ */
-.cal-day{text-align:center;min-height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;border:1px solid transparent;font-size:12px;gap:2px;position:relative;}
+.cal-day{text-align:center;min-height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:6px;border:1px solid transparent;font-size:12px;gap:1px;position:relative;}
 .cal-day.clickable{cursor:pointer;}
 .cal-day.clickable:hover{border-color:#ddd;background:#f9f9f9;}
 .cal-day .dn{font-size:12px;line-height:1;pointer-events:none;}
 .cal-day .badge{font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;line-height:1.4;pointer-events:none;}
+.cal-day .mbr-row{display:flex;gap:1px;flex-wrap:wrap;justify-content:center;pointer-events:none;max-width:100%;}
+.cal-day .mbr-chip{font-size:8px;font-weight:700;padding:0px 2px;border-radius:2px;line-height:1.5;pointer-events:none;}
+.mbr-chip-ok{background:#1D9E75;color:#fff;}
+.mbr-chip-maybe{background:#EF9F27;color:#fff;}
+.confirmed-day .mbr-chip-ok{background:#085041;color:#9FE1CB;}
+.confirmed-day .mbr-chip-maybe{background:#085041;color:#9FE1CB;}
 .cand-6{background:#FCEBEB;border-color:#E24B4A !important;}
 .cand-6 .dn{color:#501313;}
 .cand-6 .badge{background:#E24B4A;color:#fff;}
@@ -286,6 +292,7 @@ function sw(tab){
   document.querySelectorAll('.tab').forEach((b,i)=>{b.classList.toggle('active',['cal','inp','mbr'][i]===tab);});
   if(tab==='mbr') renderMbr();
   if(tab==='cal') renderCal();
+  if(tab==='inp') { loadFromGAS().then(()=>{ if(inpMbr) renderInpCal(); }); }
 }
 
 function dk(y,m,d){return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}
@@ -302,6 +309,27 @@ function bestOk(y,m,d){
   return best;
 }
 
+// その日いずれかのスロットで○または△のメンバー一覧を返す
+function dayMemberStatus(k){
+  const result=[];
+  MEMBERS.forEach(mb=>{
+    const dayData=(data[mb.id]||{})[k]||{};
+    const hasOk=SLOTS.some(sl=>dayData[sl]==='ok');
+    const hasMaybe=!hasOk&&SLOTS.some(sl=>dayData[sl]==='maybe');
+    if(hasOk) result.push({id:mb.id, status:'ok'});
+    else if(hasMaybe) result.push({id:mb.id, status:'maybe'});
+  });
+  return result;
+}
+
+// その日に何らかの登録があるか
+function hasAnyEntry(k){
+  return MEMBERS.some(mb=>{
+    const dayData=(data[mb.id]||{})[k]||{};
+    return SLOTS.some(sl=>dayData[sl]&&dayData[sl]!=='');
+  });
+}
+
 function renderCal(){
   document.getElementById('cal-lbl').textContent=`${calY}年${calM+1}月`;
   const body=document.getElementById('cal-body');
@@ -314,14 +342,25 @@ function renderCal(){
     const k=dk(calY,calM,d);
     const isConf=!!confirmed[k];
     const mx=bestOk(calY,calM,d);
+    const members=dayMemberStatus(k);
     const el=document.createElement('div');
     let cls='cal-day clickable', badge='';
     if(isConf){cls+=' confirmed-day'; badge=`<span class="badge">${confirmed[k]}</span>`;}
     else if(mx>=6){cls+=' cand-6'; badge=`<span class="badge">6人</span>`;}
     else if(mx>=5){cls+=' cand-5'; badge=`<span class="badge">5人</span>`;}
     else if(mx>=4){cls+=' cand-4'; badge=`<span class="badge">4人</span>`;}
+    // メンバー記号行
+    let mbrRow='';
+    if(members.length>0){
+      mbrRow='<div class="mbr-row">';
+      members.forEach(({id,status})=>{
+        const mc=status==='ok'?'mbr-chip-ok':'mbr-chip-maybe';
+        mbrRow+=`<span class="mbr-chip ${mc}">${id}</span>`;
+      });
+      mbrRow+='</div>';
+    }
     el.className=cls;
-    el.innerHTML=`<span class="dn">${d}</span>${badge}`;
+    el.innerHTML=`<span class="dn">${d}</span>${badge}${mbrRow}`;
     const _y=calY,_m=calM,_d=d;
     el.onclick=function(){showDetail(_y,_m,_d);};
     body.appendChild(el);
@@ -333,10 +372,15 @@ function showDetail(y,m,d){
   const k=dk(y,m,d);
   const panel=document.getElementById('det-panel');
   const isConf=!!confirmed[k];
+
+  // 登録が1件もない場合は何もしない
+  if(!isConf && !hasAnyEntry(k)) return;
+
   let html=`<div class="dp-title">${m+1}月${d}日</div>`;
   if(isConf){
     html+=`<div style="padding:6px 10px;background:#1D9E75;border-radius:6px;color:#fff;font-size:13px;font-weight:600;margin-bottom:10px;">● 練習確定 — ${confirmed[k]}</div>`;
   }
+  // 全メンバーの登録状況を時間帯ごとに表示
   SLOTS.forEach(sl=>{
     html+=`<div class="slot-block"><div class="slot-label">${sl}</div><div class="member-chips">`;
     MEMBERS.forEach(mb=>{
@@ -357,7 +401,7 @@ function showDetail(y,m,d){
       html+=`</select>`;
       html+=`<button class="confirm-btn" onclick="doConfirm('${k}')">この日を練習確定する</button>`;
     }else{
-      html+=`<div style="font-size:12px;color:#666;margin-top:6px;">4人以上「空いてる」の時間帯がありません</div>`;
+      html+=`<div style="font-size:12px;color:#aaa;margin-top:6px;padding:6px 8px;background:#f9f9f9;border-radius:6px;">4人以上「空いてる」が揃うと確定ボタンが表示されます</div>`;
     }
   }else{
     html+=`<button class="unconfirm-btn" onclick="doUnconfirm('${k}')">確定を取り消す</button>`;
@@ -392,7 +436,6 @@ function onMbrSel(){
   if(inpMbr){
     inner.style.display='';
     panel.style.display='none'; panel.innerHTML='';
-    if(!data[inpMbr]) data[inpMbr]={};
     renderInpCal();
   }else{
     inner.style.display='none';
