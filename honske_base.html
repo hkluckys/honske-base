@@ -562,7 +562,7 @@ function renderSlotPanel(k,m,d){
   // メモ入力欄
   html+=`<div class="memo-row">`;
   html+=`<div class="memo-label">メモ（30文字以内・任意）</div>`;
-  html+=`<textarea class="memo-input" id="memo-input-${k}" maxlength="30" rows="2" placeholder="例：11時まで大丈夫、移動中でも参加可 など">${curMemo}</textarea>`;
+  html+=`<textarea class="memo-input" id="memo-input-${k}" maxlength="30" rows="2" placeholder="例：8時迄は大丈夫、夜は20時以降ok">${curMemo}</textarea>`;
   html+=`<div class="memo-count" id="memo-count-${k}">${curMemo.length}/30</div>`;
   html+=`<button class="memo-save-btn" onclick="saveMemo('${k}','${m}','${d}')">メモを保存</button>`;
   html+=`</div>`;
