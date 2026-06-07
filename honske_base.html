@@ -117,6 +117,19 @@ h1{font-size:18px;font-weight:600;}
 .sc .l{font-size:11px;color:#666;}
 .sc.green .n{color:#0F6E56;}
 
+/* メモ */
+.memo-row{margin-top:10px;padding-top:10px;border-top:1px solid #e5e5e5;}
+.memo-label{font-size:12px;font-weight:600;color:#666;margin-bottom:5px;}
+.memo-input{width:100%;padding:7px;border:1px solid #ddd;border-radius:6px;font-size:13px;resize:none;}
+.memo-input:focus{outline:none;border-color:#1D9E75;}
+.memo-count{font-size:11px;color:#aaa;text-align:right;margin-top:2px;}
+.memo-save-btn{margin-top:6px;padding:6px 14px;background:#1D9E75;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600;}
+.det-memo-block{margin-top:10px;padding-top:10px;border-top:1px solid #e5e5e5;}
+.det-memo-title{font-size:12px;font-weight:600;color:#666;margin-bottom:6px;}
+.det-memo-row{display:flex;gap:8px;align-items:flex-start;padding:4px 0;font-size:12px;}
+.det-memo-id{font-weight:700;min-width:20px;color:#1D9E75;}
+.det-memo-text{color:#333;flex:1;}
+
 /* GAS URL設定 */
 .gas-setup{background:#EAF3DE;border:1px solid #97C459;border-radius:8px;padding:12px;margin-bottom:1rem;}
 .gas-setup p{font-size:13px;color:#27500A;margin-bottom:8px;}
@@ -214,7 +227,7 @@ const MEMBERS=[
 const SLOTS=['午前','午後','夜'];
 const SS={ok:'○',maybe:'△',ng:'×','':'—'};
 
-let data={}, confirmed={};
+let data={}, confirmed={}, memos={};  // memos[memberId][dateKey] = 'メモ文字列'
 let calY,calM,inpY,inpM,inpMbr='';
 let GAS_URL = localStorage.getItem('honske_gas_url') || '';
 
@@ -282,6 +295,15 @@ async function loadFromGAS(){
     const rawConf = json.confirmed || {};
     confirmed = {};
     Object.keys(rawConf).forEach(k => { confirmed[normDateKey(k)] = rawConf[k]; });
+    // メモの正規化
+    const rawMemos = json.memos || {};
+    memos = {};
+    Object.keys(rawMemos).forEach(memberId => {
+      memos[memberId] = {};
+      Object.keys(rawMemos[memberId]).forEach(dateKey => {
+        memos[memberId][normDateKey(dateKey)] = rawMemos[memberId][dateKey];
+      });
+    });
     renderCal(); renderMbr();
   }catch(e){
     showError('通信エラー。GAS URLを確認してください。');
@@ -438,6 +460,17 @@ function showDetail(y,m,d){
   }else{
     html+=`<button class="unconfirm-btn" onclick="doUnconfirm('${k}')">確定を取り消す</button>`;
   }
+
+  // メモ表示（入力のあるメンバーのみ）
+  const memoEntries = MEMBERS.filter(mb => (memos[mb.id]||{})[k]);
+  if(memoEntries.length > 0){
+    html+=`<div class="det-memo-block"><div class="det-memo-title">メモ</div>`;
+    memoEntries.forEach(mb => {
+      html+=`<div class="det-memo-row"><span class="det-memo-id">${mb.id}</span><span class="det-memo-text">${(memos[mb.id]||{})[k]}</span></div>`;
+    });
+    html+=`</div>`;
+  }
+
   panel.innerHTML=html;
   panel.style.display='block';
   panel.scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -513,6 +546,7 @@ function openSlotPanel(y,m,d){
 
 function renderSlotPanel(k,m,d){
   const md=data[inpMbr][k];
+  const curMemo=(memos[inpMbr]||{})[k]||'';
   let html=`<div class="slot-input-panel">`;
   html+=`<div class="sip-title">${m+1}月${d}日</div>`;
   html+=`<div class="sip-hint">時間帯ごとに参加可否を登録してください</div>`;
@@ -525,8 +559,28 @@ function renderSlotPanel(k,m,d){
     if(cur!=='') html+=`<button class="sbt clear-btn" onclick="setSlot('${k}','${sl}','')">—</button>`;
     html+=`</div></div>`;
   });
+  // メモ入力欄
+  html+=`<div class="memo-row">`;
+  html+=`<div class="memo-label">メモ（30文字以内・任意）</div>`;
+  html+=`<textarea class="memo-input" id="memo-input-${k}" maxlength="30" rows="2" placeholder="例：11時まで大丈夫、移動中でも参加可 など">${curMemo}</textarea>`;
+  html+=`<div class="memo-count" id="memo-count-${k}">${curMemo.length}/30</div>`;
+  html+=`<button class="memo-save-btn" onclick="saveMemo('${k}','${m}','${d}')">メモを保存</button>`;
+  html+=`</div>`;
   html+=`</div>`;
   document.getElementById('slot-panel').innerHTML=html;
+  // 文字数カウンター
+  const ta=document.getElementById(`memo-input-${k}`);
+  if(ta) ta.oninput=function(){document.getElementById(`memo-count-${k}`).textContent=this.value.length+'/30';};
+}
+
+async function saveMemo(k,m,d){
+  const ta=document.getElementById(`memo-input-${k}`);
+  if(!ta) return;
+  const val=ta.value.trim();
+  if(!memos[inpMbr]) memos[inpMbr]={};
+  if(val==='') delete memos[inpMbr][k];
+  else memos[inpMbr][k]=val;
+  await postToGAS({action:'setMemo', memberId:inpMbr, dateKey:k, memo:val});
 }
 
 async function setSlot(k,sl,v){
